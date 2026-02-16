@@ -4,29 +4,28 @@ SERVER="57.128.42.40"
 USER="tunnel"
 SSH_PORT=22
 
-BASE_DIR="$HOME/atherix-tunnel"
+INSTALL_PATH="/usr/local/bin/tunnel"
+SERVICE_PATH="/etc/systemd/system/tunnel@.service"
+
+BASE_DIR="/etc/atherix-tunnel"
 KEY_FILE="$BASE_DIR/id_ed25519"
 MAP_DIR="$BASE_DIR/map"
-LOG_DIR="$BASE_DIR/logs"
-
-mkdir -p "$BASE_DIR" "$MAP_DIR" "$LOG_DIR"
-chmod 700 "$BASE_DIR"
 
 RED="\e[31m"; GRN="\e[32m"; YEL="\e[33m"; CYN="\e[36m"; RST="\e[0m"
 BOLD="\e[1m"
 
-# =============================
-# بانر ترحيبي
-# =============================
+# ════════════════════════════════════════
+# عرض الرسالة الترحيبية
+# ════════════════════════════════════════
 banner(){
 clear
 echo -e "${GRN}${BOLD}"
-echo "██████╗ ██████╗"
-echo "██║  ██║██║   ██║"
-echo "███████║██║   ██║"
-echo "██╔══██║██║   ██║"
-echo "██║  ██║╚██████╔╝"
-echo "╚═╝  ╚═╝ ╚═════╝"
+echo "  ██╗  ██╗██╗   ██╗ ██████╗███████╗███████╗ ██████╗ ██████╗ "
+echo "  ██║  ██║██║   ██║██╔════╝██╔════╝██╔════╝██╔═══██╗██╔══██╗"
+echo "  ███████║██║   ██║██║     █████╗  █████╗  ██║   ██║██████╔╝"
+echo "  ██╔══██║██║   ██║██║     ██╔══╝  ██╔══╝  ██║   ██║██╔═══╝ "
+echo "  ██║  ██║╚██████╔╝╚██████╗███████╗███████╗╚██████╔╝██║     "
+echo "  ╚═╝  ╚═╝ ╚═════╝  ╚═════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝     "
 echo -e "${RST}"
 echo -e "${YEL}${BOLD}HYCREO DEV${RST}"
 echo -e "${CYN}MADE BY MUSLIMON :)${RST}"
@@ -40,71 +39,144 @@ done
 echo
 }
 
+# عرض البانر عند كل تشغيل
 banner
 
-# =============================
-# وظائف التونل
-# =============================
-start_tunnel(){
-port="$1"
-log_file="$LOG_DIR/tunnel-$port.log"
-
-echo -e "${GRN}Starting persistent tunnel for port $port...${RST}"
-
-# Loop مستمر لكل بورت
-while true; do
-    if ! pgrep -f "ssh.*-R.*$port.*$SERVER" >/dev/null; then
-        echo "[$(date)] Tunnel down. Restarting..." >> "$log_file"
-        ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no \
-            -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
-            -o ExitOnForwardFailure=yes \
-            -N -R "$port:localhost:$port" "$USER@$SERVER" -p $SSH_PORT \
-            >> "$log_file" 2>&1 &
-        echo "$port" > "$MAP_DIR/$port.map"
-        echo "[$(date)] Tunnel up at $SERVER:$port" >> "$log_file"
+# ════════════════════════════════════════
+# تثبيت الأداة كـ systemd
+# ════════════════════════════════════════
+install_tool() {
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "${RED}Run as root${RST}"
+        exit 1
     fi
-    sleep 5
-done
+
+    mkdir -p "$BASE_DIR" "$MAP_DIR"
+    chmod 700 "$BASE_DIR"
+
+    cp "$0" "$INSTALL_PATH"
+    chmod +x "$INSTALL_PATH"
+
+    cat > "$SERVICE_PATH" <<EOF
+[Unit]
+Description=Persistent SSH Tunnel %i
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/ssh -i $KEY_FILE -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -N -R %i:localhost:%i $USER@$SERVER -p $SSH_PORT
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+
+    echo -e "${GRN}Installed successfully.${RST}"
+    echo "Command available: tunnel"
+    exit 0
 }
 
-start_range(){
-start=$(echo "$1" | cut -d- -f1)
-end=$(echo "$1" | cut -d- -f2)
-for ((p=start; p<=end; p++)); do
-    start_tunnel "$p" &
-done
+# ════════════════════════════════════════
+# أوامر التونل
+# ════════════════════════════════════════
+start_port() {
+    port="$1"
+
+    if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+        echo -e "${RED}Invalid port${RST}"
+        return 1
+    fi
+
+    systemctl enable tunnel@$port
+    systemctl restart tunnel@$port
+
+    echo "$port" > "$MAP_DIR/$port.map"
+
+    echo -e "${GRN}Active 24/7: $SERVER:$port${RST}"
+}
+
+start_range() {
+    start=$(echo "$1" | cut -d- -f1)
+    end=$(echo "$1" | cut -d- -f2)
+
+    for ((p=start; p<=end; p++)); do
+        start_port "$p"
+    done
 }
 
 list_ports(){
-echo
-echo -e "${BOLD}Active tunnels:${RST}"
-for f in "$MAP_DIR"/*.map; do
-    [ -f "$f" ] || continue
-    port=$(basename "$f" .map)
-    echo -e "  - $SERVER:$port"
-done
-echo
+    echo
+    echo -e "${BOLD}Current active ports:${RST}"
+    for f in "$MAP_DIR"/*.map; do
+        [ -f "$f" ] || continue
+        port=$(basename "$f" .map)
+        echo -e "  - $SERVER:$port"
+    done
+    echo
 }
 
-# =============================
-# واجهة تفاعلية تظهر مباشرة عند التشغيل
-# =============================
-while true; do
-    echo
-    echo "Select an option:"
-    echo "1) See ports list"
-    echo "2) Add ports"
-    read -p "Choice: " choice
+# ════════════════════════════════════════
+# القائمة التفاعلية تظهر مباشرة
+# ════════════════════════════════════════
+interactive_menu(){
+    while true; do
+        echo
+        echo "Select an option:"
+        echo "1) See ports list"
+        echo "2) Add ports"
+        read -p "Choice: " choice
 
-    case "$choice" in
-        1) list_ports ;;
-        2)
-            read -p "First port (e.g., 1111): " first
-            read -p "Last port (e.g., 8000): " last
-            echo -e "${YEL}Wait....${RST}"
-            start_range "$first-$last"
-            echo -e "${GRN}Thx for using this tool!!${RST}"
-            ;;
-        *) echo "Invalid choice" ;;
-    esac
-done
+        case "$choice" in
+            1) list_ports ;;
+            2)
+                read -p "First port (e.g., 1111): " first
+                read -p "Last port (e.g., 8000): " last
+                echo -e "${YEL}Wait....${RST}"
+                start_range "$first-$last"
+                echo -e "${GRN}Thx for using this tool!!${RST}"
+                ;;
+            *) echo "Invalid choice" ;;
+        esac
+    done
+}
+
+# ════════════════════════════════════════
+# معالجة الأوامر
+# ════════════════════════════════════════
+if [[ "$1" == "--install" ]]; then
+    install_tool
+    exit 0
+fi
+
+case "$1" in
+custom)
+    if [[ "$2" == *"-"* ]]; then
+        start_range "$2"
+    else
+        start_port "$2"
+    fi
+    ;;
+get)
+    port="$2"
+    if [ -f "$MAP_DIR/$port.map" ]; then
+        echo -e "${GRN}$SERVER:$port${RST}"
+    else
+        echo -e "${RED}Not active${RST}"
+    fi
+    ;;
+"interactive"|""|"-h"|"--help")
+    interactive_menu
+    ;;
+*)
+    echo
+    echo "Usage:"
+    echo "tunnel custom <port>"
+    echo "tunnel custom 3000-8000"
+    echo "tunnel get <port>"
+    echo "tunnel interactive   # menu to add/view ports"
+    echo
+    interactive_menu
+    ;;
+esac
