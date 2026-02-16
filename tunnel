@@ -51,9 +51,8 @@ log_file="$LOG_DIR/tunnel-$port.log"
 
 echo -e "${GRN}Starting persistent tunnel for port $port...${RST}"
 
-# Loop مستمر
+# Loop مستمر لكل بورت
 while true; do
-    # تحقق من وجود SSH فعال
     if ! pgrep -f "ssh.*-R.*$port.*$SERVER" >/dev/null; then
         echo "[$(date)] Tunnel down. Restarting..." >> "$log_file"
         ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no \
@@ -88,57 +87,24 @@ echo
 }
 
 # =============================
-# واجهة تفاعلية
+# واجهة تفاعلية تظهر مباشرة عند التشغيل
 # =============================
-interactive_menu(){
-echo
-echo "Select an option:"
-echo "1) See ports list"
-echo "2) Add ports"
-read -p "Choice: " choice
-
-case "$choice" in
-    1) list_ports ;;
-    2)
-        read -p "First port (e.g., 1111): " first
-        read -p "Last port (e.g., 8000): " last
-        echo -e "${YEL}Wait....${RST}"
-        start_range "$first-$last"
-        echo -e "${GRN}Thx for using this tool!!${RST}"
-        ;;
-    *) echo "Invalid choice" ;;
-esac
-}
-
-# =============================
-# معالجة الأوامر
-# =============================
-case "$1" in
-custom)
-    if [[ "$2" == *"-"* ]]; then
-        start_range "$2"
-    else
-        start_tunnel "$2" &
-    fi
-    ;;
-get)
-    port="$2"
-    if [ -f "$MAP_DIR/$port.map" ]; then
-        echo -e "${GRN}$SERVER:$port${RST}"
-    else
-        echo -e "${RED}Not active${RST}"
-    fi
-    ;;
-interactive)
-    interactive_menu
-    ;;
-*)
+while true; do
     echo
-    echo "Usage:"
-    echo "tunnel custom <port>"
-    echo "tunnel custom 3000-8000"
-    echo "tunnel get <port>"
-    echo "tunnel interactive"
-    echo
-    ;;
-esac
+    echo "Select an option:"
+    echo "1) See ports list"
+    echo "2) Add ports"
+    read -p "Choice: " choice
+
+    case "$choice" in
+        1) list_ports ;;
+        2)
+            read -p "First port (e.g., 1111): " first
+            read -p "Last port (e.g., 8000): " last
+            echo -e "${YEL}Wait....${RST}"
+            start_range "$first-$last"
+            echo -e "${GRN}Thx for using this tool!!${RST}"
+            ;;
+        *) echo "Invalid choice" ;;
+    esac
+done
