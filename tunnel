@@ -15,35 +15,34 @@ RED="\e[31m"; GRN="\e[32m"; YEL="\e[33m"; CYN="\e[36m"; RST="\e[0m"
 BOLD="\e[1m"
 
 # ════════════════════════════════════════
-#  عرض الرسالة الترحيبية
+# بانر الترحيب
 # ════════════════════════════════════════
 banner(){
-clear
-echo -e "${GRN}${BOLD}"
-echo "  ██╗  ██╗██╗   ██╗ ██████╗███████╗███████╗ ██████╗ ██████╗ "
-echo "  ██║  ██║██║   ██║██╔════╝██╔════╝██╔════╝██╔═══██╗██╔══██╗"
-echo "  ███████║██║   ██║██║     █████╗  █████╗  ██║   ██║██████╔╝"
-echo "  ██╔══██║██║   ██║██║     ██╔══╝  ██╔══╝  ██║   ██║██╔═══╝ "
-echo "  ██║  ██║╚██████╔╝╚██████╗███████╗███████╗╚██████╔╝██║     "
-echo "  ╚═╝  ╚═╝ ╚═════╝  ╚═════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝     "
-echo -e "${RST}"
-echo -e "${YEL}${BOLD}HYCREO DEV${RST}"
-echo -e "${CYN}MADE BY MUSLIMON :)${RST}"
-echo
-for i in 1 2 3; do
-    echo -ne "${GRN}WAIT"
-    for j in $(seq 1 $i); do echo -ne "."; done
+    clear
+    echo -e "${GRN}${BOLD}"
+    echo "  ██╗  ██╗██╗   ██╗ ██████╗███████╗███████╗ ██████╗ ██████╗ "
+    echo "  ██║  ██║██║   ██║██╔════╝██╔════╝██╔════╝██╔═══██╗██╔══██╗"
+    echo "  ███████║██║   ██║██║     █████╗  █████╗  ██║   ██║██████╔╝"
+    echo "  ██╔══██║██║   ██║██║     ██╔══╝  ██╔══╝  ██║   ██║██╔═══╝ "
+    echo "  ██║  ██║╚██████╔╝╚██████╗███████╗███████╗╚██████╔╝██║     "
+    echo "  ╚═╝  ╚═╝ ╚═════╝  ╚═════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝     "
     echo -e "${RST}"
-    sleep 0.5
-done
-echo
+    echo -e "${YEL}${BOLD}HYCREO DEV${RST}"
+    echo -e "${CYN}MADE BY MUSLIMON :)${RST}"
+    echo
+    for i in 1 2 3; do
+        echo -ne "${GRN}WAIT"
+        for j in $(seq 1 $i); do echo -ne "."; done
+        echo -e "${RST}"
+        sleep 0.5
+    done
+    echo
 }
 
-# عرض البانر
 banner
 
 # ════════════════════════════════════════
-# تثبيت الأداة كـ systemd
+# تثبيت systemd
 # ════════════════════════════════════════
 install_tool() {
     if [ "$EUID" -ne 0 ]; then
@@ -72,18 +71,16 @@ WantedBy=multi-user.target
 EOF
 
     systemctl daemon-reload
-
     echo -e "${GRN}Installed successfully.${RST}"
     echo "Command available: tunnel"
     exit 0
 }
 
 # ════════════════════════════════════════
-# أوامر التونل
+# وظائف التونل
 # ════════════════════════════════════════
 start_port() {
     port="$1"
-
     if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
         echo -e "${RED}Invalid port${RST}"
         return 1
@@ -91,16 +88,13 @@ start_port() {
 
     systemctl enable tunnel@$port
     systemctl restart tunnel@$port
-
     echo "$port" > "$MAP_DIR/$port.map"
-
     echo -e "${GRN}Active 24/7: $SERVER:$port${RST}"
 }
 
 start_range() {
     start=$(echo "$1" | cut -d- -f1)
     end=$(echo "$1" | cut -d- -f2)
-
     for ((p=start; p<=end; p++)); do
         start_port "$p"
     done
@@ -118,11 +112,11 @@ list_ports(){
 }
 
 # ════════════════════════════════════════
-# واجهة تفاعلية بعد التحميل
+# القائمة التفاعلية
 # ════════════════════════════════════════
 interactive_menu(){
     echo "Select an option:"
-    echo "1) See ports list"
+    echo "1) See ports"
     echo "2) Add ports"
     read -p "Choice: " choice
 
@@ -131,12 +125,12 @@ interactive_menu(){
             list_ports
             ;;
         2)
-            read -p "First port (e.g., 1111): " first
-            read -p "Last port (e.g., 8000): " last
+            read -p "First port: " first
+            read -p "Last port: " last
             echo -e "${YEL}Wait....${RST}"
             sleep 1
             start_range "$first-$last"
-            echo -e "${GRN}Thx for using our host!!${RST}"
+            echo -e "${GRN}Thx for using this tool!!${RST}"
             ;;
         *)
             echo "Invalid choice"
@@ -168,7 +162,7 @@ get)
         echo -e "${RED}Not active${RST}"
     fi
     ;;
-interactive)
+interactive|"")
     interactive_menu
     ;;
 *)
